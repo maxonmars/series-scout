@@ -1,10 +1,11 @@
+import { readFile } from "node:fs/promises";
 import { JWT } from "google-auth-library";
 import { z } from "zod";
 import { ExternalServiceError, OperationError } from "../../application/errors.ts";
 import type { CalendarEvent, CalendarPort } from "../../application/ports.ts";
 import { PRODUCT_ID } from "../../domain/calendar.ts";
 import { addDays } from "../../domain/dates.ts";
-import { createHttpClient, type HttpClientOptions, type ReportHealth } from "../http.ts";
+import { createHttpClient, type HttpClientOptions } from "../http.ts";
 
 const BASE_URL = "https://www.googleapis.com/calendar/v3";
 const SCOPE = "https://www.googleapis.com/auth/calendar.events";
@@ -26,7 +27,10 @@ const storedEvent = z.object({
   extendedProperties: z.object({ private: z.record(z.string(), z.string()).optional() }).optional(),
 });
 
+const serviceAccountKey = z.object({ client_email: z.string().min(1), private_key: z.string().min(1) });
+
 function tokenFailure(error: unknown): Error {
+  if (error instanceof OperationError) return error;
   const code = error instanceof Error && "code" in error ? String(error.code) : "";
   if (FILE_ERRORS.has(code)) {
     return new OperationError(
@@ -36,15 +40,41 @@ function tokenFailure(error: unknown): Error {
   return new ExternalServiceError("google", NETWORK_ERRORS.has(code) ? "unavailable" : "auth");
 }
 
-function serviceAccountToken(credentialsPath: string, reportHealth: ReportHealth | undefined): () => Promise<string> {
-  const client = new JWT({ keyFile: credentialsPath, scopes: [SCOPE] });
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+// Ключ читается здесь, а не через keyFile: google-auth-library 11.3.1 с keyFile не заполняет iss в JWT,
+// и Google отвечает invalid_grant «account not found».
+async function createJwtClient(credentialsPath: string, fetch: typeof globalThis.fetch | undefined): Promise<JWT> {
+  const key = serviceAccountKey.safeParse(parseJson(await readFile(credentialsPath, "utf8")));
+  if (!key.success) {
+    throw new OperationError(
+      "Google Calendar: файл не похож на JSON-ключ сервисного аккаунта — проверьте GOOGLE_APPLICATION_CREDENTIALS",
+    );
+  }
+  return new JWT({
+    email: key.data.client_email,
+    key: key.data.private_key,
+    scopes: [SCOPE],
+    ...(fetch ? { transporterOptions: { fetchImplementation: fetch } } : {}),
+  });
+}
+
+function serviceAccountToken(options: GoogleCalendarOptions): () => Promise<string> {
+  let client: JWT | undefined;
   return async () => {
     let token: string | null | undefined;
     try {
+      client ??= await createJwtClient(options.credentialsPath, options.fetch);
       token = (await client.getAccessToken()).token;
     } catch (error) {
       const failure = tokenFailure(error);
-      reportHealth?.("google", failure);
+      options.reportHealth?.("google", failure);
       throw failure;
     }
     if (!token) throw new ExternalServiceError("google", "auth");
@@ -70,7 +100,7 @@ export type GoogleCalendar = CalendarPort & { readonly verifyAccess: () => Promi
 /** Изменяет только события с меткой продукта; ID события задаёт приложение. */
 export function createGoogleCalendar(options: GoogleCalendarOptions): GoogleCalendar {
   const http = createHttpClient({ ...options, service: "google" });
-  const accessToken = options.getAccessToken ?? serviceAccountToken(options.credentialsPath, options.reportHealth);
+  const accessToken = options.getAccessToken ?? serviceAccountToken(options);
   const eventsUrl = `${options.baseUrl ?? BASE_URL}/calendars/${encodeURIComponent(options.calendarId)}/events`;
   const eventUrl = (eventId: string) => `${eventsUrl}/${encodeURIComponent(eventId)}`;
 

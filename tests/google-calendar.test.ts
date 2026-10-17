@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createGoogleCalendar } from "../src/adapters/google/calendar.ts";
 import { OperationError } from "../src/application/errors.ts";
 import type { CalendarEvent } from "../src/application/ports.ts";
@@ -104,5 +108,68 @@ describe("Google Calendar", () => {
     const { calendar } = setup(() => (++attempts < 3 ? json({}, 503) : json({ id: "ss1s2g1" })));
     await calendar.createEvent(EVENT);
     expect(attempts).toBe(3);
+  });
+});
+
+describe("Google Calendar: ключ сервисного аккаунта", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "series-scout-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function keyFile(content: unknown): string {
+    const path = join(dir, "google.json");
+    writeFileSync(path, JSON.stringify(content));
+    return path;
+  }
+
+  it("подписывает запрос токена с client_email из файла ключа в iss", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const credentialsPath = keyFile({
+      type: "service_account",
+      client_email: "bot@project.iam.gserviceaccount.com",
+      private_key: privateKey.export({ type: "pkcs8", format: "pem" }),
+    });
+    const claims: unknown[] = [];
+    let authorization: string | null = null;
+    const calendar = createGoogleCalendar({
+      calendarId: "series@group.calendar.google.com",
+      credentialsPath,
+      sleep: async () => {},
+      fetch: async (input, init) => {
+        if (String(input).startsWith("https://oauth2.googleapis.com/token")) {
+          const assertion = new URLSearchParams(String(init?.body)).get("assertion") ?? "";
+          claims.push(JSON.parse(Buffer.from(assertion.split(".")[1] ?? "", "base64url").toString()));
+          return json({ access_token: "service-token", token_type: "Bearer", expires_in: 3600 });
+        }
+        authorization = new Headers(init?.headers).get("authorization");
+        return json({ items: [] });
+      },
+    });
+    await calendar.verifyAccess();
+    expect(claims).toEqual([
+      expect.objectContaining({
+        iss: "bot@project.iam.gserviceaccount.com",
+        scope: "https://www.googleapis.com/auth/calendar.events",
+      }),
+    ]);
+    expect(authorization).toBe("Bearer service-token");
+  });
+
+  it("файл без client_email и private_key отклоняет до сетевых запросов", async () => {
+    let requests = 0;
+    const calendar = createGoogleCalendar({
+      calendarId: "series@group.calendar.google.com",
+      credentialsPath: keyFile({ type: "authorized_user" }),
+      fetch: async () => {
+        requests++;
+        return json({});
+      },
+    });
+    await expect(calendar.verifyAccess()).rejects.toThrow(/не похож на JSON-ключ сервисного аккаунта/);
+    expect(requests).toBe(0);
   });
 });
