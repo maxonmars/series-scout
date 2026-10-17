@@ -2,13 +2,22 @@ services:
   series-scout:
     build: .
     image: series-scout:local
+    restart: unless-stopped
+    stop_grace_period: 30s
     env_file:
       - path: .env
         required: false
     environment:
       DATA_DIR: /data
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-service-account
     volumes:
       - series-scout-data:/data
+    secrets:
+      - google-service-account
+
+secrets:
+  google-service-account:
+    file: ./secrets/google-service-account.json
 
 volumes:
   series-scout-data:

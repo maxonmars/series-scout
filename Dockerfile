@@ -16,4 +16,4 @@ COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node
 ENTRYPOINT ["node", "dist/app/main.js"]
-CMD ["--help"]
+CMD ["run"]

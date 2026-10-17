@@ -11,7 +11,7 @@
     "dev": "node src/app/main.ts",
     "start": "node dist/app/main.js",
     "doctor": "node src/app/main.ts doctor",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node dist/app/main.js --help > /dev/null",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp -R src/prompts dist/prompts && node dist/app/main.js --help > /dev/null",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
