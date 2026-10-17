@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+dist
+coverage
+.local
+.env
+.env.*
+secrets
+*credentials*.json
+service-account*.json
+.DS_Store

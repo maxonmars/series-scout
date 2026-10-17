@@ -1,0 +1,38 @@
+{
+  "name": "series-scout",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Персональный Telegram-бот для выбора сериалов и отслеживания премьер новых сезонов",
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "node src/app/main.ts",
+    "start": "node dist/app/main.js",
+    "doctor": "node src/app/main.ts doctor",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node dist/app/main.js --help > /dev/null",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check:deps": "depcruise src --config .dependency-cruiser.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check": "npm run lint && npm run typecheck && npm run check:deps && npm run test && npm run build"
+  },
+  "dependencies": {
+    "google-auth-library": "11.3.1",
+    "grammy": "1.46.0",
+    "openai": "7.36.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "dependency-cruiser": "18.6.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

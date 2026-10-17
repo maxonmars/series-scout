@@ -1,0 +1,14 @@
+services:
+  series-scout:
+    build: .
+    image: series-scout:local
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - series-scout-data:/data
+
+volumes:
+  series-scout-data:
