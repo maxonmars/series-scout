@@ -26,8 +26,12 @@ function describe(name: string, status: SettingStatus): string {
   }
 }
 
-export function runDoctor({ env, nodeVersion, inspectPath }: DoctorInput): DoctorReport {
-  const lines = ["Series Scout: локальная диагностика", "Сетевые соединения не проверяются.", ""];
+export function runDoctor({ env, nodeVersion, inspectPath }: DoctorInput, { network = false } = {}): DoctorReport {
+  const lines = [
+    "Series Scout: локальная диагностика",
+    network ? "Подключения проверяются после локальной проверки." : "Сетевые соединения не проверяются.",
+    "",
+  ];
 
   const nodeMajor = Number(nodeVersion.split(".")[0]);
   const nodeSupported = nodeMajor === SUPPORTED_NODE_MAJOR;
@@ -53,7 +57,11 @@ export function runDoctor({ env, nodeVersion, inspectPath }: DoctorInput): Docto
   const ok = nodeSupported && missing === 0 && invalid === 0;
   lines.push("");
   if (ok) {
-    lines.push("Итог: все настройки заданы и прошли локальную проверку; соединения не проверялись.");
+    lines.push(
+      network
+        ? "Итог: все настройки заданы и прошли локальную проверку."
+        : "Итог: все настройки заданы и прошли локальную проверку; соединения не проверялись.",
+    );
   } else {
     const problems = [
       ...(nodeSupported ? [] : ["неподдерживаемая версия Node.js"]),

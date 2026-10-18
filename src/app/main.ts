@@ -10,12 +10,16 @@ process.stdout.on("error", (error: NodeJS.ErrnoException) => {
 // Переменные, уже заданные в окружении, process.loadEnvFile не перезаписывает.
 if (existsSync(".env")) process.loadEnvFile(".env");
 
-process.exitCode = runCli(process.argv.slice(2), {
+process.exitCode = await runCli(process.argv.slice(2), {
   env: process.env,
   nodeVersion: process.versions.node,
   inspectPath,
   output: {
     out: (text) => process.stdout.write(text),
     err: (text) => process.stderr.write(text),
+  },
+  onShutdown: (handler) => {
+    process.once("SIGTERM", handler);
+    process.once("SIGINT", handler);
   },
 });

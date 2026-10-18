@@ -34,6 +34,31 @@ module.exports = {
       to: { path: "(^|/)node_modules/(?!zod/)|^(node:)?sqlite$" },
     },
     {
+      name: "grammy-only-in-telegram-adapter",
+      comment: "Каждый SDK используется только своим адаптером.",
+      severity: "error",
+      from: { pathNot: "^src/adapters/telegram/" },
+      to: { path: "(^|/)node_modules/grammy/" },
+    },
+    {
+      name: "openai-only-in-deepseek-adapter",
+      severity: "error",
+      from: { pathNot: "^src/adapters/deepseek/" },
+      to: { path: "(^|/)node_modules/openai/" },
+    },
+    {
+      name: "google-auth-only-in-google-adapter",
+      severity: "error",
+      from: { pathNot: "^src/adapters/google/" },
+      to: { path: "(^|/)node_modules/google-auth-library/" },
+    },
+    {
+      name: "sqlite-only-in-sqlite-adapter",
+      severity: "error",
+      from: { path: "^src/", pathNot: "^src/adapters/sqlite/" },
+      to: { path: "^(node:)?sqlite$" },
+    },
+    {
       name: "only-app-imports-app",
       severity: "error",
       from: { path: "^src/", pathNot: "^src/app/" },
