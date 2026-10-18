@@ -105,19 +105,20 @@ export function createDeepSeekTasteModel(options: DeepSeekOptions): DeepSeekTast
       { role: "user", content: JSON.stringify(payload) },
     ];
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const response = await call(() =>
-        client.chat.completions.create({
-          model: options.model,
-          messages,
-          response_format: { type: "json_object" },
-          max_tokens: options.maxOutputTokens ?? 2_000,
-        }),
-      );
+      const params = {
+        model: options.model,
+        messages,
+        response_format: { type: "json_object" as const },
+        max_tokens: options.maxOutputTokens ?? 2_000,
+        // Рассуждения deepseek-flash расходуют max_tokens и могут занять его целиком, оставив content пустым.
+        thinking: { type: "disabled" },
+      };
+      const response = await call(() => client.chat.completions.create(params));
       const choice = response.choices[0];
       const content = choice?.message.content ?? "";
-      if (content.trim() === "") throw new ExternalServiceError("deepseek", "empty_response");
-      const problem =
-        choice?.finish_reason === "length" ? "ответ обрезан по лимиту длины" : formatProblem(content, schema);
+      const truncated = choice?.finish_reason === "length";
+      if (content.trim() === "") throw new ExternalServiceError("deepseek", truncated ? "truncated" : "empty_response");
+      const problem = truncated ? "ответ обрезан по лимиту длины" : formatProblem(content, schema);
       if (problem === null) return schema.parse(JSON.parse(content));
       if (attempt === 2) break;
       messages.push(

@@ -54,7 +54,11 @@ describe("DeepSeek", () => {
   it("запрашивает JSON Output у заданной модели и возвращает проверенный результат", async () => {
     const { model, bodies } = setup([() => completion('{"items":[{"tmdbId":7,"explanation":"Подходит"}]}')]);
     expect(await model.rankCandidates(RANKING_INPUT)).toEqual([{ tmdbId: 7, explanation: "Подходит" }]);
-    expect(bodies[0]).toMatchObject({ model: "deepseek-flash", response_format: { type: "json_object" } });
+    expect(bodies[0]).toMatchObject({
+      model: "deepseek-flash",
+      response_format: { type: "json_object" },
+      thinking: { type: "disabled" },
+    });
   });
 
   it("повреждённый JSON исправляется одним повтором с описанием проблемы", async () => {
@@ -79,6 +83,12 @@ describe("DeepSeek", () => {
   it("пустой ответ — ошибка без повтора", async () => {
     const { model, bodies } = setup([() => completion("")]);
     await expect(model.rankCandidates(RANKING_INPUT)).rejects.toMatchObject({ kind: "empty_response" });
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("пустой ответ, обрезанный по длине, — ошибка truncated без повтора", async () => {
+    const { model, bodies } = setup([() => completion("", "length")]);
+    await expect(model.rankCandidates(RANKING_INPUT)).rejects.toMatchObject({ kind: "truncated" });
     expect(bodies).toHaveLength(1);
   });
 

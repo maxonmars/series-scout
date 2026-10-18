@@ -9,7 +9,8 @@ export type FailureKind =
   | "unavailable"
   | "rejected"
   | "invalid_response"
-  | "empty_response";
+  | "empty_response"
+  | "truncated";
 
 /** Отказ внешнего сервиса. Текст ошибки не содержит ни тела ответа, ни настроек: только сервис и вид отказа. */
 export class ExternalServiceError extends Error {
@@ -80,6 +81,8 @@ function describeKind(error: ExternalServiceError): string {
       return "ответ в неожиданном формате";
     case "empty_response":
       return "пустой ответ";
+    case "truncated":
+      return "ответ не уместился в лимит длины";
   }
 }
 
